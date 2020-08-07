@@ -15,7 +15,7 @@ pipeline {
     stage ('Archive') {
       steps{
         echo "Archiving Project"
-        archiveArtifacts artifacts: '**/*.jar', caseSensitive: false, defaultExcludes: false, fingerprint: true
+        archiveArtifacts artifacts: '**/*.jar', caseSensitive: false, defaultExcludes: false
       }
     }
     stage ('Build Docker Image') {
