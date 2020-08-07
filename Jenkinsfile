@@ -1,7 +1,7 @@
 pipeline {
   environment {
-    registry = "prabhavagrawal/petclinic"
-    registryCredential = 'docker_hub_prabhavagrawal'
+    registry = "basavarajbhav/petclinic"
+    registryCredential = 'docker_hub_basavarajbhavi'
     dockerImage = ''
   }
   agent any
@@ -41,7 +41,7 @@ pipeline {
       steps{
         echo "Deploying to Dev Environment"
         sh "docker rm -f petclinic || true"
-        sh "docker run -d --name=petclinic -p 8081:8080 prabhavagrawal/petclinic"
+        sh "docker run -d --name=petclinic -p 8081:8080 basavarajbhav/petclinic"
       }
     }
   }
