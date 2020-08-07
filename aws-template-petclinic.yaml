@@ -1,0 +1,114 @@
+Parameters:
+  ELBVPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select the VPC for ELB Target Group.
+  ELBSubnet:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select 2 Subnet for ELB.
+  SSHKey:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+
+Resources:
+  MyInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Select [0, !Ref ELBSubnet]
+      ImageId: ami-02354e95b39ca8dec
+      InstanceType: t2.micro
+      KeyName: !Ref SSHKey
+      SecurityGroupIds:
+        - Fn::GetAtt: [ServerSecurityGroup, GroupId]
+      # we install our web server with user data
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -xe
+          yum update -y
+          amazon-linux-extras install docker
+          yum install docker
+          service docker start
+          usermod -a -G docker ec2-user
+          docker run -d --name=petclinic -p 8081:8080 prabhavagrawal/petclinic
+
+  MyInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Select [1, !Ref ELBSubnet]
+      ImageId: ami-02354e95b39ca8dec
+      InstanceType: t2.micro
+      KeyName: !Ref SSHKey
+      SecurityGroupIds:
+        - Fn::GetAtt: [ServerSecurityGroup, GroupId]
+      # we install our web server with user data
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -xe
+          yum update -y
+          amazon-linux-extras install docker
+          yum install docker
+          service docker start
+          usermod -a -G docker ec2-user
+          docker run -d --name=petclinic -p 8081:8080 prabhavagrawal/petclinic
+
+  ELBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "ELB SG"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 8081
+          IpProtocol: tcp
+          ToPort: 8081
+
+  ServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "EC2 SG"
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+      - SourceSecurityGroupName: !Ref ELBSecurityGroup
+        FromPort: 8081
+        IpProtocol: tcp
+        ToPort: 8081
+
+  MyLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Subnets:
+        - !Select [0, !Ref ELBSubnet]
+        - !Select [1, !Ref ELBSubnet]
+      SecurityGroups:
+        - Fn::GetAtt: [ELBSecurityGroup, GroupId]
+
+  MyLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyLoadBalancerTargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 8081
+      Protocol: HTTP
+
+  MyLoadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      Port: 8081
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref ELBVPC
+      Targets:
+        - Id: !Ref MyInstance1
+          Port: 8081
+        - Id: !Ref MyInstance2
+          Port: 8081
+Outputs:
+  ELBDNSName:
+    Description: The DNSName of the load balancer
+    Value: !GetAtt MyLoadBalancer.DNSName
